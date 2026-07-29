@@ -59,6 +59,12 @@ Run the installer directly without saving it to disk:
   bash <(curl -LsSf https://github.com/wieluk/psychopy_linux_installer/releases/latest/download/psychopy_linux_installer)
   ```
 
+- **PsychoPy Studio Mode** (lightweight: no Python/wxPython, just an AppImage):
+
+  ```bash
+  bash <(curl -LsSf https://github.com/wieluk/psychopy_linux_installer/releases/latest/download/psychopy_linux_installer) --studio
+  ```
+
 ### Option 2: Download Script for Reuse
 
 1. **Download the installer script:**
@@ -87,6 +93,12 @@ Run the installer directly without saving it to disk:
      ./psychopy_linux_installer
      ```
 
+   - **PsychoPy Studio Mode**:
+
+     ```bash
+     ./psychopy_linux_installer --studio
+     ```
+
 ## Options
 
 | Option | Description | Default |
@@ -108,6 +120,7 @@ Run the installer directly without saving it to disk:
 | `--remove-psychopy-settings` | Delete existing PsychoPy user settings at `~/.psychopy3` during installation. | *false* |
 | `--no-fonts` | Skip installation of additional font packages. | *false* |
 | `--cleanup` | Removes build packages and uv cache after installation.<br>**Warning**: Setting this may cause non-admin installations to fail after this main installation. | *false* |
+| `--studio` | Install [PsychoPy Studio](https://github.com/psychopy/psychopy-studio) (a self-contained AppImage) instead of the classic Python/wxPython app.<br>No Python, venv, or wxPython is installed -- Studio manages its own Python environment internally.<br>Offered as an option when `--psychopy-version` resolves to `2026.2.0` or later (see Notes below); the classic app remains the default even then.<br>Ignores `--python-version`, `--wxpython-version`, `--build-wxpython`, `--wxpython-wheel-index`, `--additional-packages`, `--requirements-file`, `--no-fonts`, and `--remove-psychopy-settings`. | *false* |
 | `--gui` | Launch the graphical installer (ignores other command-line options). | *false* |
 | `-f`, `--force-overwrite` | Overwrite the target install folder if it already exists. | *false* |
 | `--log-level=LEVEL` | Set the log level. Valid values: `debug`, `info`, `warning`, `error`.<br>`debug` shows full command output. | `info` |
@@ -119,6 +132,7 @@ Run the installer directly without saving it to disk:
 - Non-Admin Installation: The `--sudo-mode=continue --install-dir=~/psychopy` option enables non-admin users to upgrade or reinstall if the packages are already installed. This option assumes an administrator has previously run the installation.
 - Version Selection: The `--psychopy-version` and `--wxpython-version` options accept specific versions from [PyPI](https://pypi.org), as well as `latest` or `git`. Note that `git` versions may be unstable and are generally not recommended.
 - If requirements.txt contains relative paths to wheel files, the wheels folder must be in the same directory as requirements.txt.
+- PsychoPy Studio: starting with PsychoPy `2026.2.0`, the classic desktop app's GUI code moved to a separate `psychopy_app` package, alongside [PsychoPy Studio](https://github.com/psychopy/psychopy-studio) (the actively developed replacement, which upstream expects to fully replace the classic app around 2027). The classic app remains the default install for any version. If `--psychopy-version` resolves to `2026.2.0` or later and `--studio` wasn't passed, interactive installs are offered a choice between the two; `--non-interactive` installs default to the classic app. Pass `--studio` explicitly to install PsychoPy Studio instead.
 
 ## Examples
 
@@ -136,17 +150,18 @@ bash <(curl -LsSf https://github.com/wieluk/psychopy_linux_installer/releases/la
 - Installs all necessary system dependencies for PsychoPy and wxPython.
 - Installs [uv](https://docs.astral.sh/uv/) (a fast Python package manager) and uses it to install the specified Python version (3.8, 3.9, or 3.10).
 - Sets up the PsychoPy installation directory at `${INSTALL_DIR}/PsychoPy-${PSYCHOPY_VERSION}-Python${PYTHON_VERSION}` (default: `/opt/psychopy`). You can customize this with `--install-dir` and `--venv-name`.
-- Creates a virtual environment and installs wxPython (downloads prebuilt wheels, tries GitHub releases, or builds from source if needed).
+- Creates a virtual environment and installs wxPython (downloads prebuilt wheels, tries GitHub releases, or builds from source if needed), logging a warning for each fallback tier it has to skip past.
 - Upgrades pip and required Python packages, then installs the specified PsychoPy version.
 - Adds user to `psychopy` group and sets security limits.
 - Generates a startup wrapper script (`start_psychopy`) with uninstaller (--unistall).
 - Optionally creates a desktop shortcut and a symbolic link in `/usr/local/bin/` or `~/local/bin`.
 - Logs all actions to a file (initially in `/tmp`, then moved to the install directory). Use `--log-level=debug` for detailed terminal output.
+- `--studio` mode skips all of the above except distro/package-manager detection, the install directory, the desktop shortcut, and the PATH symlink -- it downloads the [PsychoPy Studio](https://github.com/psychopy/psychopy-studio) AppImage (self-contained; it manages its own Python environment internally) plus a small set of runtime libraries (notably `libfuse2`, needed for the AppImage to self-mount) instead of installing Python, wxPython, or PsychoPy itself.
 
 **Notes:**
 
 - If prebuilt wxPython wheels are unavailable for your distribution, the script will attempt to build from source.
-- Building wxPython from source may take significant time and require extra disk space (ensure `/tmp` is large enough).
+- Building wxPython from source may take significant time and require extra disk space; the installer checks free (not total) `/tmp` space and offers to increase it if it's low.
 
 ## Post-Installation
 
@@ -195,6 +210,8 @@ During uninstallation, you may be prompted to remove additional files and settin
 - installed packages that have been added by psychopy_linux_installer
 
 If you have other PsychoPy environments installed on your system, it is recommended to answer **"n"** to these prompts to avoid affecting other installations.
+
+**Note:** `--studio` installs skip these prompts entirely -- there's no Python, `uv`, group, or `~/.psychopy3` settings for a Studio-only install to clean up.
 
 ## Troubleshooting
 
