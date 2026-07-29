@@ -412,6 +412,9 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ${{ matrix.image }}
+    defaults:
+      run:
+        shell: bash
     strategy:
       matrix:
         os:
@@ -427,7 +430,7 @@ jobs:
           - manjarolinux-25
           - opensuse-leap-15
         python_version: ["3.8", "3.9", "3.10"]
-        wxpython_version: ["grab", "4.2.2", "4.2.1", "4.2.0", "4.1.1"]
+        wxpython_version: ["grab", "4.2.2", "4.1.1"]
         include:
           - os: ubuntu-20
             image: ubuntu:20.04
