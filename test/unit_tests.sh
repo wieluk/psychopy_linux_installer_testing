@@ -159,15 +159,28 @@ log_message() { captured_message="$1"; }
 
 STUDIO=false NON_INTERACTIVE=true PSYCHOPY_VERSION="2025.1.0"
 maybe_offer_studio
-assert_eq "pre-2026.2.0 version is a no-op in non-interactive mode" "false" "${STUDIO}"
+assert_eq "pre-Studio-availability version is a no-op in non-interactive mode" "false" "${STUDIO}"
 
 STUDIO=false NON_INTERACTIVE=false PSYCHOPY_VERSION="2025.1.0"
 maybe_offer_studio
-assert_eq "pre-2026.2.0 version is a no-op in interactive mode" "false" "${STUDIO}"
+assert_eq "pre-Studio-availability version is a no-op in interactive mode" "false" "${STUDIO}"
 
 STUDIO=true NON_INTERACTIVE=true PSYCHOPY_VERSION="2023.1.0"
 maybe_offer_studio
 assert_eq "--studio already set short-circuits regardless of version" "true" "${STUDIO}"
+
+STUDIO=false STUDIO_OFFER_DECIDED=false NON_INTERACTIVE=true PSYCHOPY_VERSION="2026.1.0"
+captured_message=""
+maybe_offer_studio
+assert_eq "Studio-available-but-pre-split version offers Studio (STUDIO stays false, non-interactive)" "false" "${STUDIO}"
+assert_contains "pre-split NOTE mentions --studio as the opt-in" "${captured_message}" "--studio"
+((CHECKS++))
+if [[ "${captured_message}" != *"psychopy_app"* ]]; then
+    echo -e "${GREEN}${PASS_SYMBOL} PASS${NC}: pre-split NOTE does not mention psychopy_app"
+else
+    echo -e "${RED}${FAIL_SYMBOL} FAIL${NC}: pre-split NOTE does not mention psychopy_app"
+    ((ERRORS++))
+fi
 
 STUDIO=false STUDIO_OFFER_DECIDED=false NON_INTERACTIVE=true PSYCHOPY_VERSION="2026.2.1"
 captured_message=""
@@ -266,7 +279,7 @@ rm -rf "${FIXTURE_DIR}"
 print_header "process_arguments"
 
 # Not run in a subshell -- assert_* increments CHECKS/ERRORS in the caller's shell.
-PSYCHOPY_VERSION="" PYTHON_VERSION="" WXPYTHON_VERSION="" INSTALL_DIR=""
+STUDIO=false PSYCHOPY_VERSION="" PYTHON_VERSION="" WXPYTHON_VERSION="" INSTALL_DIR=""
 process_arguments --psychopy-version=2024.2.4 --python-version=3.10 --install-dir=/tmp/psychopy-test
 assert_eq "process_arguments sets PSYCHOPY_VERSION" "2024.2.4" "${PSYCHOPY_VERSION}"
 assert_eq "process_arguments sets PYTHON_VERSION" "3.10" "${PYTHON_VERSION}"
@@ -289,18 +302,31 @@ output=$( (process_arguments --log-level=bogus) 2>&1 )
 rc=$?
 assert_eq "invalid --log-level exits non-zero" "1" "${rc}"
 
-STUDIO=false
+STUDIO=false PSYCHOPY_VERSION="" PYTHON_VERSION=""
 process_arguments --studio
 assert_eq "process_arguments sets STUDIO" "true" "${STUDIO}"
 
-# log_message only acts on ERROR:*, so only non-fatal-ness (not message text) can be asserted here.
+STUDIO=false PSYCHOPY_VERSION="" PYTHON_VERSION=""
+process_arguments --studio --studio-version=2026.1.2
+assert_eq "process_arguments sets STUDIO_VERSION" "2026.1.2" "${STUDIO_VERSION}"
+
 output=$( (STUDIO=false; process_arguments --studio --python-version=3.8) 2>&1 )
 rc=$?
-assert_eq "--studio + --python-version does not error (warns only)" "0" "${rc}"
+assert_eq "--studio + --python-version errors" "1" "${rc}"
+assert_contains "--studio + --python-version prints an ERROR" "${output}" "ERROR"
 
 output=$( (STUDIO=false; process_arguments --studio --additional-packages=foo) 2>&1 )
 rc=$?
-assert_eq "--studio + --additional-packages does not error (warns only)" "0" "${rc}"
+assert_eq "--studio + --additional-packages errors" "1" "${rc}"
+
+output=$( (STUDIO=false; process_arguments --studio --psychopy-version=2026.2.1) 2>&1 )
+rc=$?
+assert_eq "--studio + --psychopy-version errors" "1" "${rc}"
+assert_contains "--studio + --psychopy-version error mentions --studio-version" "${output}" "--studio-version"
+
+output=$( (STUDIO=false; process_arguments --studio-version=2026.1.2) 2>&1 )
+rc=$?
+assert_eq "--studio-version without --studio errors" "1" "${rc}"
 
 # ===============================================================================
 # create_rerun_command
@@ -318,6 +344,8 @@ INSTALL_DIR="/custom/install/dir"
 # shellcheck disable=SC2034
 STUDIO=true
 # shellcheck disable=SC2034
+STUDIO_VERSION="2026.1.2"
+# shellcheck disable=SC2034
 REQUIREMENTS_FILE=""
 
 rerun_cmd=$(create_rerun_command)
@@ -325,6 +353,7 @@ assert_contains "rerun command includes non-default psychopy-version" "${rerun_c
 assert_contains "rerun command includes boolean flag for build-wxpython" "${rerun_cmd}" "--build-wxpython"
 assert_contains "rerun command includes non-default install-dir" "${rerun_cmd}" "--install-dir=/custom/install/dir"
 assert_contains "rerun command includes boolean flag for studio" "${rerun_cmd}" "--studio"
+assert_contains "rerun command includes non-default studio-version" "${rerun_cmd}" "--studio-version=2026.1.2"
 ((CHECKS++))
 if [[ "${rerun_cmd}" != *"--python-version="* ]]; then
     echo -e "${GREEN}${PASS_SYMBOL} PASS${NC}: rerun command omits options left at their default"

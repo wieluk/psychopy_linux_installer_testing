@@ -33,6 +33,7 @@ declare -A DEFAULT_OPTS=(
     [FORCE_OVERWRITE]=false
     [LOG_LEVEL]="info"
     [STUDIO]=false
+    [STUDIO_VERSION]="latest"
 )
 
 # Shared curl retry/timeout options: small lookups vs. larger file downloads.
@@ -385,6 +386,7 @@ show_help() {
             "  --no-fonts                                   Skip font installation" \
             "  --cleanup                                    Remove uv cache and build packages after installation" \
             "  --studio                                     Install PsychoPy Studio (AppImage) instead of the classic Python app" \
+            "  --studio-version=VERSION                     Set PsychoPy Studio version (default: ${DEFAULT_OPTS[STUDIO_VERSION]})" \
             "  --gui                                        Launch GUI mode (ignores CLI args)" \
             "  -f, --force-overwrite                        Overwrite install dir" \
             "  --log-level=debug|info|warning|error         Log level (default: ${DEFAULT_OPTS[LOG_LEVEL]})" \
@@ -483,6 +485,9 @@ process_arguments() {
         --studio)
             STUDIO=true
             ;;
+        --studio-version=*)
+            STUDIO_VERSION="${arg#*=}"
+            ;;
         --gui) ;;
         -f | --force-overwrite)
             FORCE_OVERWRITE=true
@@ -515,14 +520,17 @@ process_arguments() {
     fi
 
     if [ "${STUDIO}" = true ]; then
-        [ "${PYTHON_VERSION}" != "${DEFAULT_OPTS[PYTHON_VERSION]}" ] && log_message "WARNING: --python-version is ignored with --studio (PsychoPy Studio manages its own Python)."
-        [ "${WXPYTHON_VERSION}" != "${DEFAULT_OPTS[WXPYTHON_VERSION]}" ] && log_message "WARNING: --wxpython-version is ignored with --studio."
-        [ "${BUILD_WXPYTHON}" = true ] && log_message "WARNING: --build-wxpython is ignored with --studio."
-        [ -n "${WXPYTHON_WHEEL_INDEX}" ] && log_message "WARNING: --wxpython-wheel-index is ignored with --studio."
-        [ -n "${ADDITIONAL_PACKAGES}" ] && log_message "WARNING: --additional-packages is ignored with --studio."
-        [ -n "${REQUIREMENTS_FILE}" ] && log_message "WARNING: --requirements-file is ignored with --studio."
-        [ "${NO_FONTS}" = true ] && log_message "WARNING: --no-fonts is ignored with --studio."
-        [ "${REMOVE_PSYCHOPY_SETTINGS}" = true ] && log_message "WARNING: --remove-psychopy-settings is ignored with --studio (PsychoPy Studio has no ~/.psychopy3 settings)."
+        [ -n "${PSYCHOPY_VERSION}" ] && log_message "ERROR: --psychopy-version cannot be used with --studio. Use --studio-version instead." nolog
+        [ -n "${PYTHON_VERSION}" ] && log_message "ERROR: --python-version cannot be used with --studio (PsychoPy Studio manages its own Python)." nolog
+        [ -n "${WXPYTHON_VERSION}" ] && log_message "ERROR: --wxpython-version cannot be used with --studio." nolog
+        [ "${BUILD_WXPYTHON}" = true ] && log_message "ERROR: --build-wxpython cannot be used with --studio." nolog
+        [ -n "${WXPYTHON_WHEEL_INDEX}" ] && log_message "ERROR: --wxpython-wheel-index cannot be used with --studio." nolog
+        [ -n "${ADDITIONAL_PACKAGES}" ] && log_message "ERROR: --additional-packages cannot be used with --studio." nolog
+        [ -n "${REQUIREMENTS_FILE}" ] && log_message "ERROR: --requirements-file cannot be used with --studio." nolog
+        [ "${NO_FONTS}" = true ] && log_message "ERROR: --no-fonts cannot be used with --studio." nolog
+        [ "${REMOVE_PSYCHOPY_SETTINGS}" = true ] && log_message "ERROR: --remove-psychopy-settings cannot be used with --studio (PsychoPy Studio has no ~/.psychopy3 settings)." nolog
+    elif [ -n "${STUDIO_VERSION}" ]; then
+        log_message "ERROR: --studio-version cannot be used without --studio." nolog
     fi
 
     # Explicit return so the exit status isn't whatever the last "[ ... ]" check above returned.
@@ -634,13 +642,16 @@ suggest_wxpython_wheel_index() {
 maybe_offer_studio() {
     [ "${STUDIO}" = true ] && return 0
     [ "${STUDIO_OFFER_DECIDED}" = true ] && return 0
-    is_version_greater "${PSYCHOPY_VERSION}" "2026.1.99" || return 0
+    is_version_greater "${PSYCHOPY_VERSION}" "2026.0.99" || return 0
     STUDIO_OFFER_DECIDED=true
 
+    local split_note=""
+    is_version_greater "${PSYCHOPY_VERSION}" "2026.1.99" && split_note=" Note: from 2026.2.0 onward the classic app also moves into its own 'psychopy_app' package, a bridge upstream expects to retire around 2027."
+
     if [ "${NON_INTERACTIVE}" = true ]; then
-        log_message "NOTE: PsychoPy ${PSYCHOPY_VERSION} ships its classic desktop app as a separate 'psychopy_app' package (a bridge upstream expects to retire around 2027) -- installing it as usual. Pass --studio to install PsychoPy Studio, the actively developed replacement, instead."
+        log_message "NOTE: PsychoPy Studio, the actively developed replacement for the classic app, is available for PsychoPy ${PSYCHOPY_VERSION} -- installing classic as usual.${split_note} Pass --studio to install PsychoPy Studio instead."
     else
-        response=$(prompt_user "PsychoPy ${PSYCHOPY_VERSION} splits its GUI into a separate 'psychopy_app' package (the classic wxPython app upstream expects to retire around 2027) and PsychoPy Studio (the actively developed Electron-based replacement).\n\nWhich would you like to install?" \
+        response=$(prompt_user "PsychoPy Studio (the actively developed Electron-based replacement for the classic wxPython app) is available for PsychoPy ${PSYCHOPY_VERSION}.${split_note}\n\nWhich would you like to install?" \
             "Install classic PsychoPy App" \
             "Install PsychoPy Studio instead" \
             "Cancel installation")
@@ -1678,6 +1689,30 @@ check_pypi_for_version() {
     log_message "ERROR: '${package}' version '${version}' not found on PyPI." nolog
 }
 
+# Retrieves the latest PsychoPy Studio version, from the psychopy/psychopy GitHub releases that carry a Studio AppImage asset.
+get_latest_studio_version() {
+    local var_name="${1}"
+    local version
+    version=$(curl -s "${CURL_RETRY_OPTS[@]}" -H "Accept: application/vnd.github.v3+json" \
+        "https://api.github.com/repos/psychopy/psychopy/releases" |
+        jq -r '[.[] | select(.assets[].name | test("^PsychoPy_Studio_.*\\.AppImage$"))][0].tag_name // empty')
+    if [ -z "${version}" ]; then
+        log_message "ERROR: Unable to fetch the latest PsychoPy Studio version."
+    fi
+    declare -n result=${var_name}
+    # shellcheck disable=SC2034
+    result="${version}"
+}
+
+# Verifies that the requested PsychoPy Studio version exists as a GitHub release asset.
+check_studio_version() {
+    local version="${1}"
+    local url="https://github.com/psychopy/psychopy/releases/download/${version}/PsychoPy_Studio_${version}.AppImage"
+    if ! curl "${CURL_RETRY_OPTS[@]}" --head --silent --fail "${url}" >/dev/null; then
+        log_message "ERROR: PsychoPy Studio version '${version}' not found at '${url}'." nolog
+    fi
+}
+
 # Installs pip packages using uv, with a fallback to individual installations if batch fails.
 install_pip_packages_with_fallback() {
     local packages_csv="$1"
@@ -1939,16 +1974,16 @@ install_wxpython_from_github() {
 # Downloads and installs the PsychoPy Studio AppImage; no fallback source if this fails.
 install_psychopy_studio() {
     local appimage_name download_url download_path
-    appimage_name="PsychoPy_Studio_${PSYCHOPY_VERSION}.AppImage"
-    download_url="https://github.com/psychopy/psychopy/releases/download/${PSYCHOPY_VERSION}/${appimage_name}"
+    appimage_name="PsychoPy_Studio_${STUDIO_VERSION}.AppImage"
+    download_url="https://github.com/psychopy/psychopy/releases/download/${STUDIO_VERSION}/${appimage_name}"
     download_path="/tmp/${appimage_name}"
     STUDIO_APPIMAGE_PATH="${PSYCHOPY_DIR}/${appimage_name}"
 
     register_cleanup "${download_path}"
 
-    log_message "INFO: Downloading PsychoPy Studio ${PSYCHOPY_VERSION} ..."
+    log_message "INFO: Downloading PsychoPy Studio ${STUDIO_VERSION} ..."
     if ! curl "${CURL_RETRY_OPTS[@]}" --head --silent --fail "${download_url}" >/dev/null; then
-        log_message "ERROR: No PsychoPy Studio release found at '${download_url}'. This PsychoPy version may not have a Studio build." nolog
+        log_message "ERROR: No PsychoPy Studio release found at '${download_url}'." nolog
     fi
     if ! log curl "${CURL_DOWNLOAD_OPTS[@]}" -L -o "${download_path}" "${download_url}"; then
         log_message "ERROR: Failed to download PsychoPy Studio from '${download_url}'."
@@ -2123,7 +2158,7 @@ write_desktop() {
     [[ -f "${resources_dir}/${icon_file}" ]] && icon_line="Icon=${resources_dir}/${icon_file}"
 
     if [ "${STUDIO}" = true ]; then
-        comment="Comment=Run PsychoPy Studio ${PSYCHOPY_VERSION}"
+        comment="Comment=Run PsychoPy Studio ${STUDIO_VERSION}"
     else
         comment="Comment=Run PsychoPy ${PSYCHOPY_VERSION} on Python${PYTHON_VERSION} with ${args}"
     fi
@@ -2722,14 +2757,25 @@ main() {
     fi
 
     # Determine PsychoPy version to install
-    if [ "${PSYCHOPY_VERSION}" == "latest" ]; then
-        get_latest_pypi_version "psychopy" PSYCHOPY_VERSION
-    elif [ "${PSYCHOPY_VERSION}" != "git" ]; then
-        check_pypi_for_version psychopy "${PSYCHOPY_VERSION}"
+    if [ "${STUDIO}" = false ]; then
+        if [ "${PSYCHOPY_VERSION}" == "latest" ]; then
+            get_latest_pypi_version "psychopy" PSYCHOPY_VERSION
+        elif [ "${PSYCHOPY_VERSION}" != "git" ]; then
+            check_pypi_for_version psychopy "${PSYCHOPY_VERSION}"
+        fi
     fi
 
     # No-op here if --gui already decided this above.
     maybe_offer_studio
+
+    # Determine PsychoPy Studio version to install
+    if [ "${STUDIO}" = true ]; then
+        if [ "${STUDIO_VERSION}" == "latest" ]; then
+            get_latest_studio_version STUDIO_VERSION
+        else
+            check_studio_version "${STUDIO_VERSION}"
+        fi
+    fi
 
     if [ "${STUDIO}" = false ] && is_version_greater "${PSYCHOPY_VERSION}" "2024.99.99"; then
         if is_version_greater "3.9" "${PYTHON_VERSION}"; then
@@ -2741,7 +2787,7 @@ main() {
     INSTALL_DIR="${INSTALL_DIR/#\~/${HOME}}"
     INSTALL_DIR="${INSTALL_DIR%/}"
     if [ "${STUDIO}" = true ]; then
-        VENV_NAME="${VENV_NAME:-PsychoPy-Studio-${PSYCHOPY_VERSION}}"
+        VENV_NAME="${VENV_NAME:-PsychoPy-Studio-${STUDIO_VERSION}}"
     else
         VENV_NAME="${VENV_NAME:-PsychoPy-${PSYCHOPY_VERSION}-Python${PYTHON_VERSION}}"
     fi
