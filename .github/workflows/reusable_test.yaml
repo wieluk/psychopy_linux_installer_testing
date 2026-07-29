@@ -431,12 +431,14 @@ jobs:
             echo "No installation logs found in either /tmp or /tmp_dir"
           fi
 
-      - name: Verify PsychoPy Studio installation and version
+      - name: Verify PsychoPy Studio installation
         run: |
           SUDO=""; [ "$(id -u)" != "0" ] && SUDO="sudo"
-          RESOLVED_VERSION=$(curl -s "https://pypi.org/pypi/psychopy/json" | jq -r .info.version)
-          if ! $SUDO su - testpsychopyuser -c "/tmp_dir/psychopy/start_psychopy -v" | grep -qE "PsychoPy3, version $RESOLVED_VERSION"; then
-            echo "PsychoPy Studio version check failed. Expected version: $RESOLVED_VERSION"
+          # Studio is a GUI Electron app -- "-v" doesn't print a version and exit, it launches the
+          # full app, so just check the wrapper and AppImage are in place and executable (same as
+          # the installer's own final verification), rather than trying to run the GUI in CI.
+          if ! $SUDO su - testpsychopyuser -c '[ -x /tmp_dir/psychopy/start_psychopy ] && find /tmp_dir/psychopy -maxdepth 1 -name "PsychoPy_Studio_*.AppImage" -executable | grep -q .'; then
+            echo "PsychoPy Studio installation verification failed: wrapper or AppImage missing/not executable."
             exit 1
           fi
 

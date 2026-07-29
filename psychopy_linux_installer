@@ -34,6 +34,7 @@ declare -A DEFAULT_OPTS=(
     [LOG_LEVEL]="info"
     [STUDIO]=false
     [STUDIO_VERSION]="latest"
+    [REMOVE_STUDIO_SETTINGS]=false
 )
 
 # Shared curl retry/timeout options: small lookups vs. larger file downloads.
@@ -387,6 +388,7 @@ show_help() {
             "  --cleanup                                    Remove uv cache and build packages after installation" \
             "  --studio                                     Install PsychoPy Studio (AppImage) instead of the classic Python app" \
             "  --studio-version=VERSION                     Set PsychoPy Studio version (default: ${DEFAULT_OPTS[STUDIO_VERSION]})" \
+            "  --remove-studio-settings                     Remove ${HOME}/.config/psychopy4" \
             "  --gui                                        Launch GUI mode (ignores CLI args)" \
             "  -f, --force-overwrite                        Overwrite install dir" \
             "  --log-level=debug|info|warning|error         Log level (default: ${DEFAULT_OPTS[LOG_LEVEL]})" \
@@ -488,6 +490,9 @@ process_arguments() {
         --studio-version=*)
             STUDIO_VERSION="${arg#*=}"
             ;;
+        --remove-studio-settings)
+            REMOVE_STUDIO_SETTINGS=true
+            ;;
         --gui) ;;
         -f | --force-overwrite)
             FORCE_OVERWRITE=true
@@ -529,8 +534,9 @@ process_arguments() {
         [ -n "${REQUIREMENTS_FILE}" ] && log_message "ERROR: --requirements-file cannot be used with --studio." nolog
         [ "${NO_FONTS}" = true ] && log_message "ERROR: --no-fonts cannot be used with --studio." nolog
         [ "${REMOVE_PSYCHOPY_SETTINGS}" = true ] && log_message "ERROR: --remove-psychopy-settings cannot be used with --studio (PsychoPy Studio has no ~/.psychopy3 settings)." nolog
-    elif [ -n "${STUDIO_VERSION}" ]; then
-        log_message "ERROR: --studio-version cannot be used without --studio." nolog
+    else
+        [ -n "${STUDIO_VERSION}" ] && log_message "ERROR: --studio-version cannot be used without --studio." nolog
+        [ "${REMOVE_STUDIO_SETTINGS}" = true ] && log_message "ERROR: --remove-studio-settings cannot be used without --studio." nolog
     fi
 
     # Explicit return so the exit status isn't whatever the last "[ ... ]" check above returned.
@@ -2398,9 +2404,9 @@ create_start_psychopy_wrapper() {
     *) remove_cmd="echo \"Unknown package manager: ${PKG_MANAGER}. Please remove packages manually.\"" ;;
     esac
 
-    # Studio-only installs never created the Python/uv/.psychopy3 state remove_optionals cleans up.
+    # Studio-only installs never created the Python/uv/.psychopy3 state remove_optionals cleans up; they get remove_studio_config instead.
     local remove_optionals_call="    if [ \"\${mode}\" != \"n\" ]; then remove_optionals \"\${mode}\"; fi"
-    [ "${STUDIO}" = true ] && remove_optionals_call=""
+    [ "${STUDIO}" = true ] && remove_optionals_call="    if [ \"\${mode}\" != \"n\" ]; then remove_studio_config \"\${mode}\"; fi"
 
     # Classic execs psychopy (or the psychopy_app module from 2026.2.0+); Studio execs the AppImage, retrying with --appimage-extract-and-run if FUSE fails.
     local launch_line studio_appimage_basename
@@ -2473,6 +2479,36 @@ remove_optionals() {
         [[ "\${resp}" =~ ^[Yy]$ ]] && \${SUDO} rm -rf "${UV_INSTALL_DIR}"
         read -r -p "Remove python versions installed by this installer? ("${PYTHON_INSTALL_DIR}") [y/N]: " resp
         [[ "\${resp}" =~ ^[Yy]$ ]] && \${SUDO} rm -rf "${PYTHON_INSTALL_DIR}"
+    fi
+}
+
+remove_studio_config() {
+    local mode="\$1"
+    if [ "\${mode}" = "y" ]; then
+        for user in ${TARGET_USERS[*]}; do
+            user_home=\$(getent passwd "\${user}" | cut -d: -f6 2>/dev/null || echo "")
+            if [ -z "\${user_home}" ]; then
+                echo "WARNING: Could not determine home directory for user: \${user}"
+                continue
+            elif [ -d "\${user_home}/.config/psychopy4" ]; then
+                \${SUDO} rm -rf "\${user_home}/.config/psychopy4"
+                echo "Removed .config/psychopy4 for user: \${user}"
+            fi
+        done
+    elif [ "\${mode}" = "prompt" ]; then
+        read -r -p "Remove PsychoPy Studio settings (.config/psychopy4) for all target users (${TARGET_USERS[*]})? [y/N]: " resp
+        if [[ "\${resp}" =~ ^[Yy]$ ]]; then
+            for user in ${TARGET_USERS[*]}; do
+                user_home=\$(getent passwd "\${user}" | cut -d: -f6 2>/dev/null || echo "")
+                if [ -z "\${user_home}" ]; then
+                    echo "WARNING: Could not determine home directory for user: \${user}"
+                    continue
+                elif [ -d "\${user_home}/.config/psychopy4" ]; then
+                    \${SUDO} rm -rf "\${user_home}/.config/psychopy4"
+                    echo "Removed .config/psychopy4 for user: \${user}"
+                fi
+            done
+        fi
     fi
 }
 
@@ -2810,6 +2846,21 @@ main() {
         log_message "INFO: Installing PsychoPy Studio dependencies. This might take a while ..."
         install_dependencies studio_deps
         install_psychopy_studio
+
+        # remove .config/psychopy4 if flag set
+        if [ "${REMOVE_STUDIO_SETTINGS}" = true ]; then
+            log_message "INFO: Removing existing '.config/psychopy4' directories for target users."
+            for user in "${TARGET_USERS[@]}"; do
+                user_home=$(getent passwd "${user}" | cut -d: -f6 2>/dev/null || echo "")
+                if [ -z "${user_home}" ]; then
+                    log_message "WARNING: Could not determine home directory for user: ${user}"
+                    continue
+                elif [ -d "${user_home}/.config/psychopy4" ]; then
+                    sudo_wrapper rm -rf "${user_home}/.config/psychopy4"
+                    log_message "INFO: Removed .config/psychopy4 for user: ${user}"
+                fi
+            done
+        fi
     else
         # Install PsychoPy dependencies
         log_message "INFO: Installing PsychoPy dependencies. This might take a while ..."

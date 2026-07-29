@@ -328,6 +328,14 @@ output=$( (STUDIO=false; process_arguments --studio-version=2026.1.2) 2>&1 )
 rc=$?
 assert_eq "--studio-version without --studio errors" "1" "${rc}"
 
+output=$( (STUDIO=false; process_arguments --remove-studio-settings) 2>&1 )
+rc=$?
+assert_eq "--remove-studio-settings without --studio errors" "1" "${rc}"
+
+STUDIO=false PSYCHOPY_VERSION="" PYTHON_VERSION=""
+process_arguments --studio --remove-studio-settings
+assert_eq "process_arguments sets REMOVE_STUDIO_SETTINGS" "true" "${REMOVE_STUDIO_SETTINGS}"
+
 # ===============================================================================
 # create_rerun_command
 # ===============================================================================

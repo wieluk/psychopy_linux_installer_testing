@@ -122,6 +122,7 @@ Run the installer directly without saving it to disk:
 | `--cleanup` | Removes build packages and uv cache after installation.<br>**Warning**: Setting this may cause non-admin installations to fail after this main installation. | *false* |
 | `--studio` | Install [PsychoPy Studio](https://github.com/psychopy/psychopy-studio) (a self-contained AppImage) instead of the classic Python/wxPython app.<br>No Python, venv, or wxPython is installed -- Studio manages its own Python environment internally.<br>Offered as an option when `--psychopy-version` resolves to `2026.1.0` or later (see Notes below); the classic app remains the default even then.<br>Cannot be combined with `--psychopy-version`, `--python-version`, `--wxpython-version`, `--build-wxpython`, `--wxpython-wheel-index`, `--additional-packages`, `--requirements-file`, `--no-fonts`, or `--remove-psychopy-settings` -- passing any of these together with `--studio` is an error. | *false* |
 | `--studio-version=VERSION` | Specify the PsychoPy Studio version to install (e.g. `2026.1.2`, or `latest`). Only valid together with `--studio`. | `latest` |
+| `--remove-studio-settings` | Delete existing PsychoPy Studio settings at `~/.config/psychopy4` during installation. Only valid together with `--studio`. | *false* |
 | `--gui` | Launch the graphical installer (ignores other command-line options). | *false* |
 | `-f`, `--force-overwrite` | Overwrite the target install folder if it already exists. | *false* |
 | `--log-level=LEVEL` | Set the log level. Valid values: `debug`, `info`, `warning`, `error`.<br>`debug` shows full command output. | `info` |
@@ -212,7 +213,7 @@ During uninstallation, you may be prompted to remove additional files and settin
 
 If you have other PsychoPy environments installed on your system, it is recommended to answer **"n"** to these prompts to avoid affecting other installations.
 
-**Note:** `--studio` installs skip these prompts entirely -- there's no Python, `uv`, group, or `~/.psychopy3` settings for a Studio-only install to clean up.
+**Note:** `--studio` installs have no Python, `uv`, group, or `~/.psychopy3` settings to clean up, so they skip those prompts -- but are instead prompted to remove PsychoPy Studio's own settings at `~/.config/psychopy4`.
 
 ## Troubleshooting
 
