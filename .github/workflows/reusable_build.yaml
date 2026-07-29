@@ -51,7 +51,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Determine if Failure is Allowed
         id: check-failure
@@ -521,7 +521,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Determine if Failure is Allowed
         id: check-failure

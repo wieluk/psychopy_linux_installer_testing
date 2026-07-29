@@ -40,7 +40,7 @@ jobs:
       # -y alone doesn't guarantee non-interactive apt-get; some packages still prompt via debconf.
       DEBIAN_FRONTEND: noninteractive
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Create non-root sudo user
         run: |
@@ -228,7 +228,7 @@ jobs:
             exit 1
           fi
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       # Containers run as root by default; use a real non-root sudo user to exercise sudo_wrapper/SUDO_MODE properly.
       - name: Create non-root sudo user
@@ -380,7 +380,7 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Create non-root sudo user
         run: |
@@ -486,7 +486,7 @@ jobs:
     env:
       DEBIAN_FRONTEND: noninteractive
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Create non-root sudo user
         run: |
