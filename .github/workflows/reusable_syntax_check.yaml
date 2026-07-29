@@ -20,3 +20,8 @@ jobs:
         run: |
           sudo chmod +x $GITHUB_WORKSPACE/test/syntax_checks.sh
           $GITHUB_WORKSPACE/test/syntax_checks.sh
+
+      - name: Run Unit Tests
+        run: |
+          chmod +x $GITHUB_WORKSPACE/test/unit_tests.sh
+          $GITHUB_WORKSPACE/test/unit_tests.sh
