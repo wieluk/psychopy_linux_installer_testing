@@ -388,17 +388,26 @@ jobs:
 
           python --version
 
-          # wxPython's setup.py predates PEP 517 build-system declarations, so an isolated build
-          # resolves sip to the latest release by default; pin whatever this release's own
-          # requirements/devel.txt asks for (e.g. sip==6.7.9 for 4.2.1) since newer sip generates
-          # siplib.c code that no longer compiles against older wxPython sources.
-          SIP_CONSTRAINT=$(grep -oP '^sip\s*==\s*\K[0-9.]+' requirements/devel.txt 2>/dev/null || true)
-          if [ -n "$SIP_CONSTRAINT" ]; then
-              echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
-              "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints <(printf 'sip==%s\n' "$SIP_CONSTRAINT")
-          else
-              "$UV_BIN" build . --wheel -o . --python "$(command -v python)"
+          BUILD_CONSTRAINTS=$(mktemp)
+          # setuptools >=81 dropped the 'dry_run' param older wxPython setup.py code needs; capping
+          # it is harmless for newer releases too since none currently require setuptools>=81.
+          echo 'setuptools<81' >"$BUILD_CONSTRAINTS"
+
+          # Releases without their own pyproject.toml (e.g. 4.2.x) declare no PEP 517 build-system
+          # requires, so an isolated build resolves sip to the latest release by default; pin
+          # whatever this release's own requirements/devel.txt asks for (e.g. sip==6.7.9 for 4.2.1),
+          # since newer sip generates siplib.c code that no longer compiles against older sources.
+          # Releases WITH a pyproject.toml (e.g. 4.3.x) already declare their own correct sip pin
+          # there -- adding another one here would conflict and make the resolver fail outright.
+          if [ ! -f pyproject.toml ]; then
+              SIP_CONSTRAINT=$(grep -oP '^sip\s*==\s*\K[0-9.]+' requirements/devel.txt 2>/dev/null || true)
+              if [ -n "$SIP_CONSTRAINT" ]; then
+                  echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
+                  echo "sip==$SIP_CONSTRAINT" >>"$BUILD_CONSTRAINTS"
+              fi
           fi
+
+          "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints "$BUILD_CONSTRAINTS"
 
           # Use a case-insensitive glob to capture the wheel file.
           WXPYTHON_WHEEL=$(ls [Ww][Xx][Pp][Yy][Tt][Hh][Oo][Nn]-*.whl)
@@ -871,17 +880,26 @@ jobs:
 
           python --version
 
-          # wxPython's setup.py predates PEP 517 build-system declarations, so an isolated build
-          # resolves sip to the latest release by default; pin whatever this release's own
-          # requirements/devel.txt asks for (e.g. sip==6.7.9 for 4.2.1) since newer sip generates
-          # siplib.c code that no longer compiles against older wxPython sources.
-          SIP_CONSTRAINT=$(grep -oP '^sip\s*==\s*\K[0-9.]+' requirements/devel.txt 2>/dev/null || true)
-          if [ -n "$SIP_CONSTRAINT" ]; then
-              echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
-              "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints <(printf 'sip==%s\n' "$SIP_CONSTRAINT")
-          else
-              "$UV_BIN" build . --wheel -o . --python "$(command -v python)"
+          BUILD_CONSTRAINTS=$(mktemp)
+          # setuptools >=81 dropped the 'dry_run' param older wxPython setup.py code needs; capping
+          # it is harmless for newer releases too since none currently require setuptools>=81.
+          echo 'setuptools<81' >"$BUILD_CONSTRAINTS"
+
+          # Releases without their own pyproject.toml (e.g. 4.2.x) declare no PEP 517 build-system
+          # requires, so an isolated build resolves sip to the latest release by default; pin
+          # whatever this release's own requirements/devel.txt asks for (e.g. sip==6.7.9 for 4.2.1),
+          # since newer sip generates siplib.c code that no longer compiles against older sources.
+          # Releases WITH a pyproject.toml (e.g. 4.3.x) already declare their own correct sip pin
+          # there -- adding another one here would conflict and make the resolver fail outright.
+          if [ ! -f pyproject.toml ]; then
+              SIP_CONSTRAINT=$(grep -oP '^sip\s*==\s*\K[0-9.]+' requirements/devel.txt 2>/dev/null || true)
+              if [ -n "$SIP_CONSTRAINT" ]; then
+                  echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
+                  echo "sip==$SIP_CONSTRAINT" >>"$BUILD_CONSTRAINTS"
+              fi
           fi
+
+          "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints "$BUILD_CONSTRAINTS"
 
           # Use a case-insensitive glob to capture the wheel file.
           WXPYTHON_WHEEL=$(ls [Ww][Xx][Pp][Yy][Tt][Hh][Oo][Nn]-*.whl)
