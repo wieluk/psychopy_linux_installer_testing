@@ -20,7 +20,10 @@ jobs:
           - os: ubuntu-22
             runs_on: ubuntu-22.04
         exclude:
+          # "grab" uses the script's current default wxPython version, which requires Python >=3.10.
           - python_version: "3.8"
+            wxpython_version: "grab"
+          - python_version: "3.9"
             wxpython_version: "grab"
       fail-fast: false
     permissions:
@@ -261,9 +264,17 @@ jobs:
           SUDO=""; [ "$(id -u)" != "0" ] && SUDO="sudo"
           func_block=$(awk '/^install_dependencies\(\) *\{/,/^\}/' psychopy_linux_installer)
 
+          # Case labels can combine managers (e.g. "yum | dnf)"), so split on "|" and match a whole alternative, not just a bare "pkg)" line.
           pkg_block=$(echo "$func_block" | awk -v pkg="$PKG_MANAGER" '
-            $0 ~ "^[[:space:]]*"pkg"\\)" {found=1; next}
-            found && $0 ~ "^[[:space:]]*;;" {exit}
+            !found && $0 ~ /^[[:space:]]*[A-Za-z0-9_.| -]+\)[[:space:]]*$/ {
+              label = $0
+              gsub(/^[[:space:]]*|[[:space:]]*$/, "", label)
+              sub(/\)[[:space:]]*$/, "", label)
+              n = split(label, alts, /[[:space:]]*\|[[:space:]]*/)
+              for (i = 1; i <= n; i++) if (alts[i] == pkg) { found=1; next }
+              next
+            }
+            found && $0 ~ /^[[:space:]]*;;[[:space:]]*$/ {exit}
             found {print}
           ')
 
@@ -457,7 +468,10 @@ jobs:
           - os: opensuse-leap-15
             image: opensuse/leap:15
         exclude:
+          # "grab" uses the script's current default wxPython version, which requires Python >=3.10.
           - python_version: "3.8"
+            wxpython_version: "grab"
+          - python_version: "3.9"
             wxpython_version: "grab"
           - os: fedora-40
             python_version: "3.8"
@@ -733,9 +747,17 @@ jobs:
           SUDO=""; [ "$(id -u)" != "0" ] && SUDO="sudo"
           func_block=$(awk '/^install_dependencies\(\) *\{/,/^\}/' psychopy_linux_installer)
 
+          # Case labels can combine managers (e.g. "yum | dnf)"), so split on "|" and match a whole alternative, not just a bare "pkg)" line.
           pkg_block=$(echo "$func_block" | awk -v pkg="$PKG_MANAGER" '
-            $0 ~ "^[[:space:]]*"pkg"\\)" {found=1; next}
-            found && $0 ~ "^[[:space:]]*;;" {exit}
+            !found && $0 ~ /^[[:space:]]*[A-Za-z0-9_.| -]+\)[[:space:]]*$/ {
+              label = $0
+              gsub(/^[[:space:]]*|[[:space:]]*$/, "", label)
+              sub(/\)[[:space:]]*$/, "", label)
+              n = split(label, alts, /[[:space:]]*\|[[:space:]]*/)
+              for (i = 1; i <= n; i++) if (alts[i] == pkg) { found=1; next }
+              next
+            }
+            found && $0 ~ /^[[:space:]]*;;[[:space:]]*$/ {exit}
             found {print}
           ')
 
