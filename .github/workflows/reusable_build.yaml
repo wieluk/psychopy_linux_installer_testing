@@ -28,6 +28,11 @@ jobs:
           # "grab-legacy" uses the script's default for Python <3.10 -- 3.10 is already covered by "grab".
           - python_version: "3.10"
             wxpython_version: "grab-legacy"
+          # wxPython 4.2.5 requires Python >=3.10; building it for 3.8/3.9 can never succeed.
+          - python_version: "3.8"
+            wxpython_version: "4.2.5"
+          - python_version: "3.9"
+            wxpython_version: "4.2.5"
       fail-fast: false
     permissions:
       contents: write
@@ -84,11 +89,13 @@ jobs:
             PKG_MANAGER="pacman"
           elif command -v dnf > /dev/null; then
             $SUDO dnf makecache -q
-            $SUDO dnf install -y jq curl
+            # RHEL-family minimal images ship curl-minimal, which conflicts with the full curl package.
+            $SUDO dnf install -y --allowerasing jq curl
             PKG_MANAGER="dnf"
           elif command -v yum > /dev/null; then
             $SUDO yum makecache -q
-            $SUDO yum install -y jq curl
+            # RHEL-family minimal images ship curl-minimal, which conflicts with the full curl package.
+            $SUDO yum install -y --allowerasing jq curl
             PKG_MANAGER="yum"
           elif command -v zypper > /dev/null; then
             $SUDO zypper refresh
@@ -380,7 +387,18 @@ jobs:
           cd "$WXPYTHON_DIR"
 
           python --version
-          python -m pip wheel .
+
+          # wxPython's setup.py predates PEP 517 build-system declarations, so an isolated build
+          # resolves sip to the latest release by default; pin whatever this release's own
+          # requirements/devel.txt asks for (e.g. sip==6.7.9 for 4.2.1) since newer sip generates
+          # siplib.c code that no longer compiles against older wxPython sources.
+          SIP_CONSTRAINT=$(grep -oP '^sip\s*==\s*\K[0-9.]+' requirements/devel.txt 2>/dev/null || true)
+          if [ -n "$SIP_CONSTRAINT" ]; then
+              echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
+              "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints <(printf 'sip==%s\n' "$SIP_CONSTRAINT")
+          else
+              "$UV_BIN" build . --wheel -o . --python "$(command -v python)"
+          fi
 
           # Use a case-insensitive glob to capture the wheel file.
           WXPYTHON_WHEEL=$(ls [Ww][Xx][Pp][Yy][Tt][Hh][Oo][Nn]-*.whl)
@@ -485,6 +503,11 @@ jobs:
           # "grab-legacy" uses the script's default for Python <3.10 -- 3.10 is already covered by "grab".
           - python_version: "3.10"
             wxpython_version: "grab-legacy"
+          # wxPython 4.2.5 requires Python >=3.10; building it for 3.8/3.9 can never succeed.
+          - python_version: "3.8"
+            wxpython_version: "4.2.5"
+          - python_version: "3.9"
+            wxpython_version: "4.2.5"
           - os: fedora-40
             python_version: "3.10"
             wxpython_version: "4.1.1"
@@ -549,11 +572,13 @@ jobs:
             PKG_MANAGER="pacman"
           elif command -v dnf > /dev/null; then
             $SUDO dnf makecache -q
-            $SUDO dnf install -y jq curl
+            # RHEL-family minimal images ship curl-minimal, which conflicts with the full curl package.
+            $SUDO dnf install -y --allowerasing jq curl
             PKG_MANAGER="dnf"
           elif command -v yum > /dev/null; then
             $SUDO yum makecache -q
-            $SUDO yum install -y jq curl
+            # RHEL-family minimal images ship curl-minimal, which conflicts with the full curl package.
+            $SUDO yum install -y --allowerasing jq curl
             PKG_MANAGER="yum"
           elif command -v zypper > /dev/null; then
             $SUDO zypper refresh
@@ -845,7 +870,18 @@ jobs:
           cd "$WXPYTHON_DIR"
 
           python --version
-          python -m pip wheel .
+
+          # wxPython's setup.py predates PEP 517 build-system declarations, so an isolated build
+          # resolves sip to the latest release by default; pin whatever this release's own
+          # requirements/devel.txt asks for (e.g. sip==6.7.9 for 4.2.1) since newer sip generates
+          # siplib.c code that no longer compiles against older wxPython sources.
+          SIP_CONSTRAINT=$(grep -oP '^sip\s*==\s*\K[0-9.]+' requirements/devel.txt 2>/dev/null || true)
+          if [ -n "$SIP_CONSTRAINT" ]; then
+              echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
+              "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints <(printf 'sip==%s\n' "$SIP_CONSTRAINT")
+          else
+              "$UV_BIN" build . --wheel -o . --python "$(command -v python)"
+          fi
 
           # Use a case-insensitive glob to capture the wheel file.
           WXPYTHON_WHEEL=$(ls [Ww][Xx][Pp][Yy][Tt][Hh][Oo][Nn]-*.whl)
