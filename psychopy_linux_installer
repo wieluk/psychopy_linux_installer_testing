@@ -16,7 +16,7 @@ CURRENT_USER="$(id -un)"
 declare -A DEFAULT_OPTS=(
     [PSYCHOPY_VERSION]="latest"
     [PYTHON_VERSION]="3.10"
-    [WXPYTHON_VERSION]="4.3.0"
+    [WXPYTHON_VERSION]="4.3.1"
     [WXPYTHON_WHEEL_INDEX]=""
     [BUILD_WXPYTHON]=false
     [INSTALL_DIR]="/opt/psychopy"
@@ -36,6 +36,9 @@ declare -A DEFAULT_OPTS=(
     [STUDIO_VERSION]="latest"
     [REMOVE_STUDIO_SETTINGS]=false
 )
+
+# Highest wxPython version that still supports Python <3.10 (4.2.5+ requires Python >=3.10).
+WXPYTHON_LEGACY_VERSION="4.2.1"
 
 # Shared curl retry/timeout options: small lookups vs. larger file downloads.
 CURL_RETRY_OPTS=(--retry 3 --retry-delay 2 --connect-timeout 10 --max-time 30)
@@ -767,10 +770,10 @@ show_gui() {
     # wxPython version
     if [ "${STUDIO}" = false ] && [[ "${checklist_result}" == *"wxpython version"* ]]; then
         wxpython_versions=$(fetch_versions_from_pypi wxPython)
-        if [[ "${PYTHON_VERSION}" =~ ^3\.8(\.[0-9]+)?$ ]]; then
-            log_message "INFO: Python 3.8.x selected. Only wxPython versions up to 4.2.2 are compatible."
-            wxpython_versions=$(echo "${wxpython_versions}" | awk '$1 <= "4.2.2"')
-            wxpython_default="4.2.2"
+        if [[ "${PYTHON_VERSION}" =~ ^3\.(8|9)(\.[0-9]+)?$ ]]; then
+            log_message "INFO: Python ${PYTHON_VERSION} selected. Only wxPython versions up to ${WXPYTHON_LEGACY_VERSION} are compatible (4.2.5+ requires Python >=3.10)."
+            wxpython_versions=$(echo "${wxpython_versions}" | awk -v max="${WXPYTHON_LEGACY_VERSION}" '$1 <= max')
+            wxpython_default="${WXPYTHON_LEGACY_VERSION}"
         else
             wxpython_default="${DEFAULT_OPTS[WXPYTHON_VERSION]}"
         fi
@@ -2725,12 +2728,12 @@ main() {
         process_arguments "${@}"
     fi
 
-    if [ "${STUDIO}" = false ] && [[ "${PYTHON_VERSION}" =~ ^3\.8(\.[0-9]+)?$ ]]; then
+    if [ "${STUDIO}" = false ] && [[ "${PYTHON_VERSION}" =~ ^3\.(8|9)(\.[0-9]+)?$ ]]; then
         if [[ -z "${WXPYTHON_VERSION}" ]]; then
-            WXPYTHON_VERSION="4.2.2"
-            log_message "INFO: Python 3.8.x selected. Only wxPython versions up to 4.2.2 are compatible. Using: ${WXPYTHON_VERSION}."
-        elif is_version_greater "${WXPYTHON_VERSION}" "4.2.2"; then
-            log_message "ERROR: wxPython > 4.2.2 is not supported with Python 3.8." nolog
+            WXPYTHON_VERSION="${WXPYTHON_LEGACY_VERSION}"
+            log_message "INFO: Python ${PYTHON_VERSION} selected. Only wxPython versions up to ${WXPYTHON_LEGACY_VERSION} are compatible (4.2.5+ requires Python >=3.10). Using: ${WXPYTHON_VERSION}."
+        elif is_version_greater "${WXPYTHON_VERSION}" "${WXPYTHON_LEGACY_VERSION}"; then
+            log_message "ERROR: wxPython > ${WXPYTHON_LEGACY_VERSION} is not supported with Python < 3.10." nolog
         fi
     fi
 

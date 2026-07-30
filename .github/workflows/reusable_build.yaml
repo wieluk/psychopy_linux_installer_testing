@@ -13,7 +13,7 @@ jobs:
           - ubuntu-24
           - ubuntu-22
         python_version: ["3.8", "3.9", "3.10"]
-        wxpython_version: ["grab", "4.2.2", "4.2.1", "4.2.0", "4.1.1"]
+        wxpython_version: ["grab", "grab-legacy", "4.2.5", "4.1.1"]
         include:
           - os: ubuntu-24
             runs_on: ubuntu-24.04
@@ -25,6 +25,9 @@ jobs:
             wxpython_version: "grab"
           - python_version: "3.9"
             wxpython_version: "grab"
+          # "grab-legacy" uses the script's default for Python <3.10 -- 3.10 is already covered by "grab".
+          - python_version: "3.10"
+            wxpython_version: "grab-legacy"
       fail-fast: false
     permissions:
       contents: write
@@ -59,7 +62,7 @@ jobs:
       - name: Determine if Failure is Allowed
         id: check-failure
         run: |
-          if [[ "${{ matrix.wxpython_version }}" == "grab" ]]; then
+          if [[ "${{ matrix.wxpython_version }}" == "grab" || "${{ matrix.wxpython_version }}" == "grab-legacy" ]]; then
             echo "ALLOW_FAILURE=false" >> $GITHUB_ENV
           else
             echo "ALLOW_FAILURE=true" >> $GITHUB_ENV
@@ -110,6 +113,12 @@ jobs:
             WXPYTHON_VERSION=$(grep -m1 '^\s*\[WXPYTHON_VERSION\]' psychopy_linux_installer | sed -n 's/.*="\([^"]*\)".*/\1/p')
             if [ -z "$WXPYTHON_VERSION" ]; then
               echo "Error: Failed to extract WXPYTHON_VERSION from script."
+              exit 1
+            fi
+          elif [ "${{ matrix.wxpython_version }}" = "grab-legacy" ]; then
+            WXPYTHON_VERSION=$(grep -m1 '^WXPYTHON_LEGACY_VERSION=' psychopy_linux_installer | sed -n 's/.*="\([^"]*\)".*/\1/p')
+            if [ -z "$WXPYTHON_VERSION" ]; then
+              echo "Error: Failed to extract WXPYTHON_LEGACY_VERSION from script."
               exit 1
             fi
           else
@@ -441,7 +450,7 @@ jobs:
           - manjarolinux-25
           - opensuse-leap-15
         python_version: ["3.8", "3.9", "3.10"]
-        wxpython_version: ["grab", "4.2.2", "4.1.1"]
+        wxpython_version: ["grab", "grab-legacy", "4.2.5", "4.1.1"]
         include:
           - os: ubuntu-20
             image: ubuntu:20.04
@@ -473,39 +482,15 @@ jobs:
             wxpython_version: "grab"
           - python_version: "3.9"
             wxpython_version: "grab"
-          - os: fedora-40
-            python_version: "3.8"
-            wxpython_version: "4.2.1"
-          - os: fedora-40
-            python_version: "3.9"
-            wxpython_version: "4.2.1"
-          - os: fedora-40
-            python_version: "3.10"
-            wxpython_version: "4.2.1"
+          # "grab-legacy" uses the script's default for Python <3.10 -- 3.10 is already covered by "grab".
+          - python_version: "3.10"
+            wxpython_version: "grab-legacy"
           - os: fedora-40
             python_version: "3.10"
             wxpython_version: "4.1.1"
           - os: fedora-41
-            python_version: "3.8"
-            wxpython_version: "4.2.1"
-          - os: fedora-41
-            python_version: "3.9"
-            wxpython_version: "4.2.1"
-          - os: fedora-41
-            python_version: "3.10"
-            wxpython_version: "4.2.1"
-          - os: fedora-41
             python_version: "3.10"
             wxpython_version: "4.1.1"
-          - os: manjarolinux-25
-            python_version: "3.8"
-            wxpython_version: "4.2.1"
-          - os: manjarolinux-25
-            python_version: "3.9"
-            wxpython_version: "4.2.1"
-          - os: manjarolinux-25
-            python_version: "3.10"
-            wxpython_version: "4.2.1"
           - os: manjarolinux-25
             python_version: "3.10"
             wxpython_version: "4.1.1"
@@ -543,7 +528,7 @@ jobs:
       - name: Determine if Failure is Allowed
         id: check-failure
         run: |
-          if [[ "${{ matrix.wxpython_version }}" == "grab" ]]; then
+          if [[ "${{ matrix.wxpython_version }}" == "grab" || "${{ matrix.wxpython_version }}" == "grab-legacy" ]]; then
             echo "ALLOW_FAILURE=false" >> $GITHUB_ENV
           else
             echo "ALLOW_FAILURE=true" >> $GITHUB_ENV
@@ -593,6 +578,12 @@ jobs:
             WXPYTHON_VERSION=$(grep -m1 '^\s*\[WXPYTHON_VERSION\]' psychopy_linux_installer | sed -n 's/.*="\([^"]*\)".*/\1/p')
             if [ -z "$WXPYTHON_VERSION" ]; then
               echo "Error: Failed to extract WXPYTHON_VERSION from script."
+              exit 1
+            fi
+          elif [ "${{ matrix.wxpython_version }}" = "grab-legacy" ]; then
+            WXPYTHON_VERSION=$(grep -m1 '^WXPYTHON_LEGACY_VERSION=' psychopy_linux_installer | sed -n 's/.*="\([^"]*\)".*/\1/p')
+            if [ -z "$WXPYTHON_VERSION" ]; then
+              echo "Error: Failed to extract WXPYTHON_LEGACY_VERSION from script."
               exit 1
             fi
           else
