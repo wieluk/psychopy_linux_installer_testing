@@ -405,6 +405,10 @@ jobs:
                   echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
                   echo "sip==$SIP_CONSTRAINT" >>"$BUILD_CONSTRAINTS"
               fi
+              # GCC >=14 turned -Wincompatible-pointer-types into a hard error by default; these
+              # releases vendor their own sip/siplib/siplib.c (unrelated to the sip package pin
+              # above), written before that GCC change, where it was only ever a warning.
+              export CFLAGS="${CFLAGS:+$CFLAGS }-Wno-error=incompatible-pointer-types"
           fi
 
           "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints "$BUILD_CONSTRAINTS"
@@ -897,6 +901,10 @@ jobs:
                   echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
                   echo "sip==$SIP_CONSTRAINT" >>"$BUILD_CONSTRAINTS"
               fi
+              # GCC >=14 turned -Wincompatible-pointer-types into a hard error by default; these
+              # releases vendor their own sip/siplib/siplib.c (unrelated to the sip package pin
+              # above), written before that GCC change, where it was only ever a warning.
+              export CFLAGS="${CFLAGS:+$CFLAGS }-Wno-error=incompatible-pointer-types"
           fi
 
           "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints "$BUILD_CONSTRAINTS"
