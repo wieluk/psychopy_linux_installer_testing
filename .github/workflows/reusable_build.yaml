@@ -405,10 +405,14 @@ jobs:
                   echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
                   echo "sip==$SIP_CONSTRAINT" >>"$BUILD_CONSTRAINTS"
               fi
-              # GCC >=14 turned -Wincompatible-pointer-types into a hard error by default; these
+              # GCC >=14 turned -Wincompatible-pointer-types into a hard error by default, and these
               # releases vendor their own sip/siplib/siplib.c (unrelated to the sip package pin
-              # above), written before that GCC change, where it was only ever a warning.
-              export CFLAGS="${CFLAGS:+$CFLAGS }-Wno-error=incompatible-pointer-types"
+              # above) with one assignment that only compiled clean under the old warn-only default.
+              # wxPython's own wscript overwrites CFLAGS from wx-config, so passing -Wno-error via
+              # the environment is silently discarded -- patch the actual line instead.
+              if [ -f sip/siplib/siplib.c ]; then
+                  sed -i 's/\*selfp = va_arg(va, PyObject \*);/*selfp = (sipSimpleWrapper *)va_arg(va, PyObject *);/' sip/siplib/siplib.c
+              fi
           fi
 
           "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints "$BUILD_CONSTRAINTS"
@@ -901,10 +905,14 @@ jobs:
                   echo "Pinning sip==$SIP_CONSTRAINT for the build (per this wxPython release's own requirements/devel.txt)."
                   echo "sip==$SIP_CONSTRAINT" >>"$BUILD_CONSTRAINTS"
               fi
-              # GCC >=14 turned -Wincompatible-pointer-types into a hard error by default; these
+              # GCC >=14 turned -Wincompatible-pointer-types into a hard error by default, and these
               # releases vendor their own sip/siplib/siplib.c (unrelated to the sip package pin
-              # above), written before that GCC change, where it was only ever a warning.
-              export CFLAGS="${CFLAGS:+$CFLAGS }-Wno-error=incompatible-pointer-types"
+              # above) with one assignment that only compiled clean under the old warn-only default.
+              # wxPython's own wscript overwrites CFLAGS from wx-config, so passing -Wno-error via
+              # the environment is silently discarded -- patch the actual line instead.
+              if [ -f sip/siplib/siplib.c ]; then
+                  sed -i 's/\*selfp = va_arg(va, PyObject \*);/*selfp = (sipSimpleWrapper *)va_arg(va, PyObject *);/' sip/siplib/siplib.c
+              fi
           fi
 
           "$UV_BIN" build . --wheel -o . --python "$(command -v python)" --build-constraints "$BUILD_CONSTRAINTS"

@@ -1958,6 +1958,7 @@ install_wxpython_from_github() {
     register_cleanup "${download_path}"
 
     if curl "${CURL_RETRY_OPTS[@]}" --head --silent --fail "${download_url}" >/dev/null; then
+        log_message "WARNING: '${wheel_name}' was built in a Docker container, not on real hardware for this distro; if you run into problems with wxPython/PsychoPy, retry with --build-wxpython."
         if log curl "${CURL_DOWNLOAD_OPTS[@]}" -L -o "${download_path}" "${download_url}"; then
             log_message "INFO: Successfully downloaded wxPython wheel from GitHub release. Installing wxPython from '${wheel_name}' ..."
             renamed_wheel="${wheel_name%-"${OS_VERSION}".whl}.whl"
@@ -1980,7 +1981,7 @@ install_wxpython_from_github() {
     fi
 }
 
-# Downloads and installs the PsychoPy Studio AppImage; no fallback source if this fails.
+# Downloads and installs the PsychoPy Studio AppImage
 install_psychopy_studio() {
     local appimage_name download_url download_path
     appimage_name="PsychoPy_Studio_${STUDIO_VERSION}.AppImage"
