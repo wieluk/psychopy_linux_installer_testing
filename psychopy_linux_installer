@@ -1698,6 +1698,26 @@ check_pypi_for_version() {
     log_message "ERROR: '${package}' version '${version}' not found on PyPI." nolog
 }
 
+# Errors out early if PYTHON_VERSION doesn't satisfy this PyPI package version's declared Python
+# requirement (e.g. psychopy>=2026.2.0 and wxpython>=4.2.5 both require Python>=3.10), instead of
+# letting uv's dependency resolver fail later with a much less actionable message.
+check_pypi_python_compatibility() {
+    local package="${1}" version="${2}"
+    local requires_python min_py max_py
+
+    requires_python=$(curl -s "${CURL_RETRY_OPTS[@]}" "https://pypi.org/pypi/${package}/${version}/json" | jq -r '.info.requires_python // empty')
+    [ -z "${requires_python}" ] && return 0
+
+    min_py=$(echo "${requires_python}" | grep -oP '>=\K[0-9]+\.[0-9]+' | head -n1)
+    max_py=$(echo "${requires_python}" | grep -oP '<\K[0-9]+\.[0-9]+' | head -n1)
+
+    if [ -n "${min_py}" ] && is_version_greater "${min_py}" "${PYTHON_VERSION}"; then
+        log_message "ERROR: ${package} ${version} requires Python ${requires_python}; '--python-version=${PYTHON_VERSION}' is too old. Choose a newer --python-version or a different --${package}-version." nolog
+    elif [ -n "${max_py}" ] && ! is_version_greater "${max_py}" "${PYTHON_VERSION}"; then
+        log_message "ERROR: ${package} ${version} requires Python ${requires_python}; '--python-version=${PYTHON_VERSION}' is too new. Choose an older --python-version or a different --${package}-version." nolog
+    fi
+}
+
 # Retrieves the latest PsychoPy Studio version, from the psychopy/psychopy GitHub releases that carry a Studio AppImage asset.
 get_latest_studio_version() {
     local var_name="${1}"
@@ -1887,6 +1907,8 @@ install_wxpython() {
     elif [ "${WXPYTHON_VERSION}" != "git" ]; then
         check_pypi_for_version wxpython "${WXPYTHON_VERSION}"
     fi
+
+    [ "${WXPYTHON_VERSION}" != "git" ] && check_pypi_python_compatibility "wxpython" "${WXPYTHON_VERSION}"
 
     if [ "${WXPYTHON_VERSION}" = "git" ]; then
         log_message "INFO: Installing wxPython build dependencies. This might take a while ..."
@@ -2729,13 +2751,12 @@ main() {
         process_arguments "${@}"
     fi
 
-    if [ "${STUDIO}" = false ] && [[ "${PYTHON_VERSION}" =~ ^3\.(8|9)(\.[0-9]+)?$ ]]; then
-        if [[ -z "${WXPYTHON_VERSION}" ]]; then
-            WXPYTHON_VERSION="${WXPYTHON_LEGACY_VERSION}"
-            log_message "INFO: Python ${PYTHON_VERSION} selected. Only wxPython versions up to ${WXPYTHON_LEGACY_VERSION} are compatible (4.2.5+ requires Python >=3.10). Using: ${WXPYTHON_VERSION}."
-        elif is_version_greater "${WXPYTHON_VERSION}" "${WXPYTHON_LEGACY_VERSION}"; then
-            log_message "ERROR: wxPython > ${WXPYTHON_LEGACY_VERSION} is not supported with Python < 3.10." nolog
-        fi
+    # Explicit --wxpython-version choices are validated later in install_wxpython() against
+    # live PyPI data; this only picks a sane default for Python <3.10 users who didn't ask
+    # for a specific version, so they don't hit that error for doing nothing.
+    if [ "${STUDIO}" = false ] && [ -z "${WXPYTHON_VERSION}" ] && [[ "${PYTHON_VERSION}" =~ ^3\.(8|9)(\.[0-9]+)?$ ]]; then
+        WXPYTHON_VERSION="${WXPYTHON_LEGACY_VERSION}"
+        log_message "INFO: Python ${PYTHON_VERSION} selected. Defaulting to wxPython ${WXPYTHON_VERSION}, the newest version that still supports it."
     fi
 
     if [[ "${VENV_NAME,,}" =~ ^(\.?python|\.?uv)$ ]]; then
@@ -2817,10 +2838,8 @@ main() {
         fi
     fi
 
-    if [ "${STUDIO}" = false ] && is_version_greater "${PSYCHOPY_VERSION}" "2024.99.99"; then
-        if is_version_greater "3.9" "${PYTHON_VERSION}"; then
-            log_message "ERROR: PsychoPy versions >= 2025.1.0 only support Python versions > 3.8." nolog
-        fi
+    if [ "${STUDIO}" = false ] && [ "${PSYCHOPY_VERSION}" != "git" ] && [ "${PSYCHOPY_GIT_TAG}" != "true" ]; then
+        check_pypi_python_compatibility "psychopy" "${PSYCHOPY_VERSION}"
     fi
 
     # Set up PsychoPy installation directory

@@ -33,7 +33,11 @@ jobs:
           - os: ubuntu-22
             runs_on: ubuntu-22.04
         exclude:
+          # "latest" (2026.2.x) requires Python >=3.10; installing it on older Python is an
+          # error by design (see check_psychopy_python_compatibility in the installer).
           - python_version: "3.8"
+            psychopy_version: "latest"
+          - python_version: "3.9"
             psychopy_version: "latest"
       fail-fast: false
     env:
@@ -197,7 +201,11 @@ jobs:
         # "include" must mirror the active "os" list exactly, or unmatched entries become orphaned combos missing python_version/psychopy_version.
         include: ${{ inputs.test-mode == 'quick' && fromJson('[{"os":"debian-12","image":"debian:bookworm"},{"os":"fedora-41","image":"fedora:41"},{"os":"rocky-9","image":"rockylinux:9"},{"os":"manjarolinux-25","image":"archlinux:latest"},{"os":"opensuse-leap-15","image":"opensuse/leap:15"}]') || fromJson('[{"os":"ubuntu-20","image":"ubuntu:20.04"},{"os":"debian-13","image":"debian:trixie"},{"os":"debian-12","image":"debian:bookworm"},{"os":"debian-11","image":"debian:bullseye"},{"os":"fedora-39","image":"fedora:39"},{"os":"fedora-40","image":"fedora:40"},{"os":"fedora-41","image":"fedora:41"},{"os":"rocky-9","image":"rockylinux:9"},{"os":"centos-9","image":"quay.io/centos/centos:stream9"},{"os":"manjarolinux-25","image":"archlinux:latest"},{"os":"opensuse-leap-15","image":"opensuse/leap:15"}]') }}
         exclude:
+          # "latest" (2026.2.x) requires Python >=3.10; installing it on older Python is an
+          # error by design (see check_psychopy_python_compatibility in the installer).
           - python_version: "3.8"
+            psychopy_version: "latest"
+          - python_version: "3.9"
             psychopy_version: "latest"
       fail-fast: false
     env:
